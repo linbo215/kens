@@ -18,7 +18,7 @@ CHECK_PATH = "/iptv/live/1000.json?key=txipt"
 M3U_FILE = "py/hb_telecom.m3u"
 TVBOX_FILE = "py/hb_telecom_tvbox.txt"
 HISTORY_FILE = "py/scanned_history.json"
-CONCURRENCY = 200 if sys.platform == 'win32' else 1000 
+CONCURRENCY = 200 if sys.platform == 'win32' else 400 
 
 # 🚫 黑名单列表：直接在这里填写那些无流量、失效的 IP
 IP_BLACKLIST = [
