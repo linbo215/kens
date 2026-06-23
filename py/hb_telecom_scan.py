@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 # --- 核心配置：支持不同网段对应不同端口 ---
 TARGET_CONFIG = {
     "139.214": 9901,
-    "222.169": 9901,   
+    "222.169": 9901,    
     "58.245": 8888
 }
 CHECK_PATH = "/iptv/live/1000.json?key=txipt"
@@ -24,7 +24,7 @@ HISTORY_FILE = "py/scanned_history.json"
 # GitHub Actions 环境保持 800 并发，兼顾速度与稳定性，防止因瞬间并发太高被运营商防火墙丢包
 CONCURRENCY = 200 if sys.platform == 'win32' else 800  
 
-# 🚫 黑名单列表
+# 🚫 黑名单列表（命中后将绝对不会被扫描）
 IP_BLACKLIST = [
     "139.214.182.224", 
     "139.214.176.117",
@@ -58,7 +58,7 @@ def clean_and_weight(name):
         if p in name: return p, 100 + i 
     return name, 999
 
-# 修改探测函数：只要 TCP 握手成功，利用 tqdm.write 实时向控制台输出日志
+# 探测函数：只要 TCP 握手成功，利用 tqdm.write 实时向控制台输出日志
 async def check_host_alive(semaphore, ip, port, pbar):
     async with semaphore:
         writer = None
@@ -138,6 +138,10 @@ async def main():
             with open(HISTORY_FILE, "r", encoding="utf-8") as f:
                 old_history = json.load(f)
                 for ip in old_history:
+                    # 💡【核心修复一】：若历史数据中包含黑名单 IP，直接跳过不加入扫描
+                    if ip in IP_BLACKLIST:
+                        continue
+                        
                     matched = False
                     for prefix, port in TARGET_CONFIG.items():
                         if ip.startswith(prefix):
@@ -161,14 +165,14 @@ async def main():
     all_targets = list(dict.fromkeys(history_targets + scan_targets))
     
     if IP_BLACKLIST:
-        print(f"🛡️ 已从扫描列表中屏蔽 {len(IP_BLACKLIST)} 个黑名单 IP。")
+        print(f"🛡️ 已从扫描列表中强力屏蔽 {len(IP_BLACKLIST)} 个黑名单 IP。")
     
     semaphore = asyncio.Semaphore(CONCURRENCY)
     alive_targets = []
 
     print(f"🚀 开始探测 {len(all_targets)} 个目标（按网段动态分配对应端口）")
     
-    # 📢 流式并发改进：使用 asyncio.gather 配合内部信号量做到实时产生日志，不再批量憋着
+    # 流式并发改进：使用 asyncio.gather 配合内部信号量做到实时产生日志，不再批量憋着
     with tqdm(total=len(all_targets), desc="🔍 扫描进度", unit="IP", colour="cyan") as pbar:
         async def run_task(ip, port):
             res = await check_host_alive(semaphore, ip, port, pbar)
@@ -200,7 +204,9 @@ async def main():
                     if cat in cat_dict:
                         f.write(f"{cat},#genre#\n" + "\n".join(cat_dict[cat]) + "\n")
             
-            update_history_log(list(set([ch['ip'] for ch in all_channels])))
+            # 💡【核心修复二】：提取 IP 准备存入历史时，再次过滤清洗，保证万无一失
+            final_ips = list(set([ch['ip'] for ch in all_channels if ch['ip'] not in IP_BLACKLIST]))
+            update_history_log(final_ips)
             print(f"✅ 任务成功！生成有效源总条数: {len(all_channels)}")
     else:
         print("❌ 未发现任何有响应的活跃直播源。")
