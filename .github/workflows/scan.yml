@@ -1,4 +1,4 @@
-name: 直播源爆破扫描
+name: hb_telecom_scan
 
 on:
   schedule:
