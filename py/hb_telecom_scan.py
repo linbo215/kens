@@ -13,8 +13,8 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # --- 核心配置：支持不同网段对应不同端口 ---
 TARGET_CONFIG = {
-    "120.196": 9901,
-    "120.238": 9901  
+    "183.62": 50085,
+    "218.17": 53290  
 }
 CHECK_PATH = "/iptv/live/1000.json?key=txipt"
 M3U_FILE = "py/hb_telecom.m3u"
