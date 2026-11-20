@@ -1,23 +1,27 @@
 name: hb_telecom_scan
 
 on:
+  workflow_dispatch:
 
-  workflow_dispatch: # 支持手动点击运行
+# 推送需要写权限
+permissions:
+  contents: write
 
 jobs:
   scanner:
     runs-on: ubuntu-latest
-    # 设置超时时间，防止爆破任务卡死消耗额度（建议 1 小时左右）
     timeout-minutes: 90
 
     steps:
       - name: 🚚 检出代码
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # 完整历史，避免 push 时各种浅克隆问题
 
       - name: 🐍 安装 Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12' # 推荐 3.12 稳定性更好
+          python-version: '3.12'
 
       - name: 📦 安装依赖
         run: |
@@ -26,20 +30,25 @@ jobs:
 
       - name: 🚀 执行扫描脚本
         run: |
-          # 确保 py 目录存在，防止脚本写入报错
           mkdir -p py
-          # 执行脚本，GitHub 默认是 Linux，并发会自动切换到 400
           python py/hb_telecom_scan.py
 
       - name: 💾 提交扫描结果
         run: |
+          # 修复容器内的 safe.directory 报错（新版本 Git 常见）
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          
-          # 添加生成的文件和历史记录文件
-          git add py/hb_telecom.m3u py/hb_telecom_tvbox.txt py/scanned_history.json
-          
-          # 检查是否有变动，有则提交
+
+          # 只添加实际存在的文件，避免 pathspec 报错
+          for f in py/hb_telecom.m3u py/hb_telecom_tvbox.txt py/scanned_history.json; do
+            if [ -f "$f" ]; then
+              git add -f "$f"      # -f 防止被 .gitignore 拦截
+            else
+              echo "⚠️ 文件不存在，跳过: $f"
+            fi
+          done
+
           if git diff --staged --quiet; then
             echo "没有发现新变动，跳过提交。"
           else
